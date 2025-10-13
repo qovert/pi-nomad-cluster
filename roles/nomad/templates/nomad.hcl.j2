@@ -1,0 +1,41 @@
+data_dir  = "{{ zfs_pool_root }}/nomad"
+bind_addr = "0.0.0.0"
+name      = "{{ node_name }}"
+log_level = "INFO"
+
+server {
+  enabled          = true
+  bootstrap_expect = 3
+  heartbeat_grace  = "30s"
+  node_gc_threshold = "12h"
+}
+
+client {
+  enabled = true
+  options = {
+    "driver.raw_exec.enable" = "1"
+  }
+
+  {% for vol_name, vol in nomad_host_volumes.items() %}
+  host_volume "{{ vol_name }}" {
+    path      = "{{ vol.path }}"
+    read_only = false
+  }
+  {% endfor %}
+}
+
+plugin "docker" {
+  config {
+    endpoint = "unix:///run/podman/podman.sock"
+    allow_privileged = false
+    volumes { enabled = true }
+  }
+}
+
+consul {
+  address = "127.0.0.1:8500"
+  auto_advertise = true
+  client_service_name = "nomad-client"
+  server_service_name = "nomad"
+  checks_use_advertise = true
+}

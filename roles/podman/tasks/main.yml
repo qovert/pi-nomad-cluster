@@ -1,0 +1,22 @@
+---
+- name: Install Podman and friends
+  apt:
+    name: "{{ podman_packages }}"
+    state: present
+    update_cache: yes
+
+- name: Enable Podman socket
+  systemd:
+    name: podman.socket
+    state: started
+    enabled: yes
+
+- name: Verify podman socket exists
+  stat:
+    path: /run/podman/podman.sock
+  register: podman_socket
+
+- name: Fail if podman socket missing
+  fail:
+    msg: "Podman socket not found at /run/podman/podman.sock"
+  when: not podman_socket.stat.exists

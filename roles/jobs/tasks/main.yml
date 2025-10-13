@@ -1,0 +1,28 @@
+---
+- name: Write Hetzner token file (optional; we inline env above)
+  copy:
+    dest: "{{ zfs_pool_root }}/nomad/secrets/hetzner_token"
+    content: "{{ hetzner_api_key }}\n"
+    mode: '0600'
+
+- name: Render Traefik job file
+  template:
+    src: traefik.nomad.j2
+    dest: "{{ zfs_pool_root }}/nomad/jobs/traefik.nomad"
+    mode: '0600'
+
+- name: Render Hello job file
+  template:
+    src: hello.nomad.j2
+    dest: "{{ zfs_pool_root }}/nomad/jobs/hello.nomad"
+    mode: '0644'
+
+- name: Run Traefik job
+  command: nomad job run "{{ zfs_pool_root }}/nomad/jobs/traefik.nomad"
+  register: traefik_submit
+  changed_when: "traefik_submit.rc == 0"
+
+- name: Run Hello job
+  command: nomad job run "{{ zfs_pool_root }}/nomad/jobs/hello.nomad"
+  register: hello_submit
+  changed_when: "hello_submit.rc == 0"

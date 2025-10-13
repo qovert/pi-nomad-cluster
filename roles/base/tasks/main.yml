@@ -1,0 +1,24 @@
+---
+- name: Ensure base packages are installed
+  apt:
+    name: "{{ base_packages }}"
+    state: present
+    update_cache: yes
+
+- name: Enable NTP via systemd-timesyncd
+  command: timedatectl set-ntp true
+  changed_when: false
+
+- name: Create ZFS-backed directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ zfs_pool_root }}"
+    - "{{ zfs_pool_root }}/consul"
+    - "{{ zfs_pool_root }}/nomad"
+    - "{{ zfs_pool_root }}/containers"
+    - "{{ zfs_pool_root }}/logs"
+    - "{{ zfs_pool_root }}/nomad/traefik-acme"
+    - "{{ zfs_pool_root }}/nomad/secrets"

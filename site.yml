@@ -1,0 +1,10 @@
+---
+- hosts: all
+  become: yes
+  gather_facts: yes
+  roles:
+    - role: base
+    - role: podman
+    - role: consul
+    - role: nomad
+    - role: jobs

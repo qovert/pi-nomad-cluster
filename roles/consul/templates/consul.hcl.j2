@@ -1,0 +1,21 @@
+datacenter = "{{ consul_datacenter }}"
+data_dir   = "{{ zfs_pool_root }}/consul"
+node_name  = "{{ node_name }}"
+bind_addr  = "0.0.0.0"
+advertise_addr = "{{ advertise_addr }}"
+
+server = true
+bootstrap_expect = 3
+
+retry_join = {{ consul_retry_join | to_json }}
+
+encrypt = "{{ consul_gossip_key }}"
+verify_incoming = false
+verify_outgoing = false
+verify_server_hostname = false
+
+ui = true
+client_addr = "0.0.0.0"
+
+ports { dns = 8600 }
+recursors = ["1.1.1.1","8.8.8.8"]

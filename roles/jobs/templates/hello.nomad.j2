@@ -1,0 +1,38 @@
+job "hello" {
+  datacenters = ["{{ consul_datacenter }}"]
+  type = "service"
+
+  group "echo" {
+    network { port "http" { to = 8080 } }
+
+    task "app" {
+      driver = "docker"
+      config {
+        image = "docker.io/hashicorp/http-echo:0.2.3"
+        args  = ["-text=hello-from-nomad-on-pi"]
+        ports = ["http"]
+      }
+      service {
+        name = "hello"
+        port = "http"
+        tags = [
+          "traefik.enable=true",
+          "traefik.http.routers.hello.rule=Host(`hello.{{ cluster_domain }}`)"
+        ]
+        check {
+          name     = "alive"
+          type     = "http"
+          path     = "/"
+          interval = "10s"
+          timeout  = "2s"
+        }
+      }
+      volume_mount {
+        volume      = "containers"
+        destination = "/data"
+        read_only   = false
+      }
+      resources { cpu = 50 memory = 64 }
+    }
+  }
+}

@@ -1,0 +1,54 @@
+---
+- name: Add HashiCorp apt key
+  apt_key:
+    url: https://apt.releases.hashicorp.com/gpg
+    state: present
+
+- name: Add HashiCorp apt repo
+  apt_repository:
+    repo: "deb [arch=arm64] https://apt.releases.hashicorp.com bookworm main"
+    state: present
+
+- name: Install Consul
+  apt:
+    name: consul
+    state: present
+    update_cache: yes
+
+- name: Generate gossip key (run once on first host)
+  command: consul keygen
+  register: cgk
+  run_once: true
+  changed_when: true
+  delegate_to: "{{ groups['all'][0] }}"
+
+- name: Set cluster gossip key fact
+  set_fact:
+    consul_gossip_key: "{{ cgk.stdout }}"
+  run_once: true
+
+- name: Distribute gossip key to all hosts
+  set_fact:
+    consul_gossip_key: "{{ hostvars[groups['all'][0]].consul_gossip_key }}"
+
+- name: Write consul.hcl
+  template:
+    src: consul.hcl.j2
+    dest: /etc/consul.d/consul.hcl
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart consul
+
+- name: Enable & start consul
+  systemd:
+    name: consul
+    state: started
+    enabled: yes
+
+# Handlers
+- name: Restart consul
+  listen: Restart consul
+  systemd:
+    name: consul
+    state: restarted
