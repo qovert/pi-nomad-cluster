@@ -179,8 +179,6 @@ The playbook configures Nomad with optimized driver settings:
 
 - ✅ **docker**: Primary container runtime
 - ✅ **raw_exec**: For direct binary execution
-- ❌ **exec**: Disabled (cgroup compatibility issues)
-- ❌ **java**: Disabled (cgroup compatibility issues)
 
 ### **Security Considerations**
 
