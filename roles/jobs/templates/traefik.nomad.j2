@@ -2,46 +2,75 @@ job "traefik" {
   datacenters = ["{{ consul_datacenter }}"]
   type = {{ '"system"' if traefik_run_on_all_nodes else '"service"' }}
 
+{% if not traefik_run_on_all_nodes %}
   # Pin to pistor0 when not running on all nodes
-  {{- '' if traefik_run_on_all_nodes else '\n  constraint {\n    attribute = "${node.unique.name}"\n    operator  = "="\n    value     = "pistor0"\n  }\n' -}}
+  constraint {
+    attribute = "${node.unique.name}"
+    operator  = "="
+    value     = "pistor0"
+  }
+{% endif %}
 
   group "gw" {
     network {
-      port "web"  { static = 80  to = 80 }
-      port "webs" { static = 443 to = 443 }
+      mode = "host"
     }
 
-    volume "acme" { type = "host" read_only = false source = "traefik_acme" }
+    volume "acme" {
+      type      = "host"
+      read_only = false
+      source    = "traefik_acme"
+    }
 
     task "traefik" {
       driver = "docker"
       config {
         image = "traefik:v3.0"
-        ports = ["web","webs"]
+        network_mode = "host"
         args = [
           "--api.dashboard=true",
+          "--ping=true",
           "--entrypoints.web.address=:80",
           "--entrypoints.websecure.address=:443",
           "--providers.consulcatalog=true",
-          "--providers.consulcatalog.endpoint.address=127.0.0.1:8500",
+          "--providers.consulcatalog.endpoint.address={{ ansible_default_ipv4.address }}:8500",
           "--certificatesresolvers.le.acme.email={{ acme_contact_email }}",
           "--certificatesresolvers.le.acme.storage=/acme/acme.json",
           "--certificatesresolvers.le.acme.dnschallenge=true",
           "--certificatesresolvers.le.acme.dnschallenge.provider=hetzner"
         ]
-        volumes = [ "acme:/acme" ]
-        env = {
-          HETZNER_API_KEY = "{{ hetzner_api_key }}"
-        }
       }
-      resources { cpu = 200 memory = 256 }
+      
+      env {
+        HETZNER_API_KEY = "{{ hetzner_api_key }}"
+      }
+      
+      volume_mount {
+        volume      = "acme"
+        destination = "/acme"
+        read_only   = false
+      }
+      
+      resources {
+        cpu    = 200
+        memory = 256
+      }
+      
       service {
         name = "traefik"
-        port = "web"
+        address_mode = "driver"
+        port = 80
         tags = ["traefik.enable=true"]
+        
+        check {
+          name     = "traefik-web"
+          type     = "tcp"
+          address_mode = "driver"
+          port     = 80
+          interval = "10s"
+          timeout  = "3s"
+        }
       }
     }
-
-    volume_mount { volume = "acme" destination = "/acme" read_only = false }
   }
 }

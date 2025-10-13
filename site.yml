@@ -5,7 +5,7 @@
   gather_facts: true
   roles:
     - role: base
-    - role: podman
+    - role: docker
     - role: consul
     - role: nomad
     - role: jobs

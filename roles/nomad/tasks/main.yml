@@ -5,6 +5,19 @@
     state: present
     update_cache: true
 
+- name: Create Nomad directories with proper ownership
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: nomad
+    group: nomad
+  loop:
+    - "{{ zfs_pool_root }}/nomad"
+    - "{{ zfs_pool_root }}/nomad/traefik-acme"
+    - "{{ zfs_pool_root }}/nomad/secrets"
+    - "{{ zfs_pool_root }}/nomad/jobs"
+
 - name: Write nomad.hcl
   ansible.builtin.template:
     src: nomad.hcl.j2

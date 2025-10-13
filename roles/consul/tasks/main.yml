@@ -15,6 +15,14 @@
     state: present
     update_cache: true
 
+- name: Create Consul data directory with proper ownership
+  ansible.builtin.file:
+    path: "{{ zfs_pool_root }}/consul"
+    state: directory
+    mode: '0755'
+    owner: consul
+    group: consul
+
 - name: Generate gossip key (run once on first host)
   ansible.builtin.command: consul keygen
   register: cgk

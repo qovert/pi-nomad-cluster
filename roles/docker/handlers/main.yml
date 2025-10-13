@@ -1,0 +1,10 @@
+---
+- name: Restart docker
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted
+
+- name: Restart nomad
+  ansible.builtin.systemd:
+    name: nomad
+    state: restarted

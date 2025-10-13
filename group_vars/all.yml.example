@@ -12,14 +12,12 @@ base_packages:
   - unzip
   - dnsmasq
 
-podman_packages:
-  - podman
-  - podman-docker
-  - uidmap
-  - slirp4netns
-  - conmon
-  - runc
-  - fuse-overlayfs
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
 
 # Consul/Nomad advertise addresses come from host_vars
 consul_retry_join:

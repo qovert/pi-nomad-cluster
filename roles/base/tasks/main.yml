@@ -9,16 +9,14 @@
   ansible.builtin.command: timedatectl set-ntp true
   changed_when: false
 
-- name: Create ZFS-backed directories
+- name: Create base ZFS directories
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     mode: '0755'
+    owner: root
+    group: root
   loop:
     - "{{ zfs_pool_root }}"
-    - "{{ zfs_pool_root }}/consul"
-    - "{{ zfs_pool_root }}/nomad"
     - "{{ zfs_pool_root }}/containers"
     - "{{ zfs_pool_root }}/logs"
-    - "{{ zfs_pool_root }}/nomad/traefik-acme"
-    - "{{ zfs_pool_root }}/nomad/secrets"
