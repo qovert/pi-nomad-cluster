@@ -1,0 +1,42 @@
+# Cluster-wide settings
+cluster_domain: hrkr.us
+consul_datacenter: dc1
+zfs_pool_root: /tank
+
+# Packages
+base_packages:
+  - curl
+  - gnupg2
+  - ca-certificates
+  - jq
+  - unzip
+  - dnsmasq
+
+podman_packages:
+  - podman
+  - podman-docker
+  - uidmap
+  - slirp4netns
+  - conmon
+  - runc
+  - fuse-overlayfs
+
+# Consul/Nomad advertise addresses come from host_vars
+consul_retry_join:
+  - 172.16.30.30
+  - 172.16.30.31
+  - 172.16.30.32
+
+# Secrets (store in Ansible Vault!)
+hetzner_api_key: "CHANGE_ME_VIA_ANSIBLE_VAULT"
+acme_contact_email: "admin@hrkr.us"
+
+# Nomad host volumes (must exist on host paths)
+nomad_host_volumes:
+  containers:
+    path: "{{ zfs_pool_root }}/containers"
+  traefik_acme:
+    path: "{{ zfs_pool_root }}/nomad/traefik-acme"
+
+# Traefik deployment options
+traefik_run_on_all_nodes: false   # pin to pistor0

@@ -9,20 +9,32 @@
 Optional (convenience):
 `ansible-galaxy collection install ansible.posix` and `containers.podman` if you extend later.
 
-## Configure inventory
-Edit `inventory/hosts.yml` and `group_vars/all.yml` as needed.
+## Configure inventory and variables
 
-Store secrets with Ansible Vault:
-```bash
-ansible-vault edit group_vars/all.yml  # set hetzner_api_key, acme_contact_email
-```
+1. **Edit inventory**: Update `inventory/hosts.yml` if needed (already configured for pistor0-2)
+
+2. **Configure variables**: The main configuration is in `group_vars/all.yml` (encrypted with Ansible Vault)
+   - See `group_vars/all.yml.example` for the plaintext template and documentation
+   - Key settings: `cluster_domain`, `consul_retry_join`, `nomad_host_volumes`
+
+3. **Set secrets with Ansible Vault**:
+   ```bash
+   # Edit the encrypted vault file to set real secrets
+   ansible-vault edit group_vars/all.yml
+   
+   # Required secrets to update:
+   # - hetzner_api_key: "your-hetzner-dns-api-token"
+   # - acme_contact_email: "your-email@hrkr.us"
+   ```
 
 ## Run
+
 ```bash
 ansible-playbook -i inventory/hosts.yml site.yml
 ```
 
 This will:
+
 1. Install base tools and create `/tank` subdirs.
 2. Install Podman and enable the Docker-compatible socket.
 3. Install and configure Consul (3-server cluster, gossip encryption).
@@ -30,9 +42,11 @@ This will:
 5. Deploy Traefik ingress (ACME via Hetzner DNS) pinned to `pistor0` and a "hello" sample app.
 
 ### DNS
+
 Create an A/AAAA record (or reverse proxy/LB) for `hello.{{ cluster_domain }}` pointing to where 80/443 reach `pistor0` (or your VIP if you later add keepalived). With DNS-01, the ACME DNS challenge works via Hetzner API; public reachability on :80 isn't required for issuance.
 
 ## Notes / Next steps
+
 - Turn on ACLs and TLS for Consul/Nomad when ready.
 - If you want failover later, run Traefik on `pistor1` as a backup and add keepalived for a floating VIP.
 - Add Consul DNS forwarding via `dnsmasq` if you want `.consul` lookups from the Pis.

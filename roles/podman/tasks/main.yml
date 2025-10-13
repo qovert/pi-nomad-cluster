@@ -1,22 +1,22 @@
 ---
 - name: Install Podman and friends
-  apt:
+  ansible.builtin.apt:
     name: "{{ podman_packages }}"
     state: present
-    update_cache: yes
+    update_cache: true
 
 - name: Enable Podman socket
-  systemd:
+  ansible.builtin.systemd:
     name: podman.socket
     state: started
-    enabled: yes
+    enabled: true
 
 - name: Verify podman socket exists
-  stat:
+  ansible.builtin.stat:
     path: /run/podman/podman.sock
   register: podman_socket
 
 - name: Fail if podman socket missing
-  fail:
+  ansible.builtin.fail:
     msg: "Podman socket not found at /run/podman/podman.sock"
   when: not podman_socket.stat.exists

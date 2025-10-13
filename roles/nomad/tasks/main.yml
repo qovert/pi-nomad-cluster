@@ -1,12 +1,12 @@
 ---
 - name: Install Nomad
-  apt:
+  ansible.builtin.apt:
     name: nomad
     state: present
-    update_cache: yes
+    update_cache: true
 
 - name: Write nomad.hcl
-  template:
+  ansible.builtin.template:
     src: nomad.hcl.j2
     dest: /etc/nomad.d/nomad.hcl
     owner: root
@@ -15,21 +15,14 @@
   notify: Restart nomad
 
 - name: Ensure host volume directories exist
-  file:
+  ansible.builtin.file:
     path: "{{ item.value.path }}"
     state: directory
     mode: '0755'
   loop: "{{ nomad_host_volumes | dict2items }}"
 
 - name: Enable & start nomad
-  systemd:
+  ansible.builtin.systemd:
     name: nomad
     state: started
-    enabled: yes
-
-# Handlers
-- name: Restart nomad
-  listen: Restart nomad
-  systemd:
-    name: nomad
-    state: restarted
+    enabled: true

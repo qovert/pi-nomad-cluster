@@ -1,0 +1,61 @@
+# Ansible
+*.retry
+.vault_pass
+.ansible_vault_pass
+*.log
+
+# Ansible Galaxy
+collections/
+roles/*/tests/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Secrets and sensitive files
+group_vars/*/vault.yml
+host_vars/*/vault.yml
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Terraform (if used alongside)
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Temporary files
+*.tmp
+*.bak
+*.orig
+
+# Logs
+logs/
+*.log

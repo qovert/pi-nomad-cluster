@@ -1,16 +1,16 @@
 ---
 - name: Ensure base packages are installed
-  apt:
+  ansible.builtin.apt:
     name: "{{ base_packages }}"
     state: present
-    update_cache: yes
+    update_cache: true
 
 - name: Enable NTP via systemd-timesyncd
-  command: timedatectl set-ntp true
+  ansible.builtin.command: timedatectl set-ntp true
   changed_when: false
 
 - name: Create ZFS-backed directories
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     mode: '0755'
