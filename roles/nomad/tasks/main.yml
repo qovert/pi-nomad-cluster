@@ -5,6 +5,25 @@
     state: present
     update_cache: true
 
+- name: Create CNI plugins directory
+  ansible.builtin.file:
+    path: /opt/cni/bin
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: Download and install CNI plugins
+  ansible.builtin.unarchive:
+    src: "https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-arm64-v1.3.0.tgz"
+    dest: /opt/cni/bin
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0755'
+    creates: /opt/cni/bin/bridge
+  notify: Restart nomad
+
 - name: Create Nomad directories with proper ownership
   ansible.builtin.file:
     path: "{{ item }}"
@@ -17,6 +36,8 @@
     - "{{ zfs_pool_root }}/nomad/traefik-acme"
     - "{{ zfs_pool_root }}/nomad/secrets"
     - "{{ zfs_pool_root }}/nomad/jobs"
+    - "{{ zfs_pool_root }}/code-server"
+    - "{{ zfs_pool_root }}/code-server/workspace"
 
 - name: Write nomad.hcl
   ansible.builtin.template:

@@ -35,6 +35,18 @@ nomad_host_volumes:
     path: "{{ zfs_pool_root }}/containers"
   traefik_acme:
     path: "{{ zfs_pool_root }}/nomad/traefik-acme"
+  code_workspace:
+    path: "{{ zfs_pool_root }}/code-server/workspace"
+
+# Deployment control
+deploy_test_services: false  # Set to true for development/testing environments
+deploy_code_server: true    # Set to false if you don't want code-server in production
+
+# Environment type
+clus_env: production     # Options: development, staging, production
+
+# Code-server configuration (optional - define password to enable)
+# code_server_password: "your-secure-password-here"
 
 # Traefik deployment options
 traefik_run_on_all_nodes: false   # pin to pistor0

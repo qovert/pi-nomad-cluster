@@ -1,10 +1,4 @@
 ---
-- name: Write Hetzner token file (optional; we inline env above)
-  ansible.builtin.copy:
-    dest: "{{ zfs_pool_root }}/nomad/secrets/hetzner_token"
-    content: "{{ hetzner_api_key }}\n"
-    mode: '0600'
-
 - name: Render Traefik job file
   ansible.builtin.template:
     src: traefik.nomad.j2
@@ -13,34 +7,61 @@
     owner: nomad
     group: nomad
 
-- name: Render Hello job file
+- name: Check if Traefik job needs updates
+  ansible.builtin.command: nomad job plan "{{ zfs_pool_root }}/nomad/jobs/traefik.nomad"
+  register: traefik_plan
+  failed_when: false
+  changed_when: false
+
+- name: Deploy Traefik job
+  ansible.builtin.command: nomad job run "{{ zfs_pool_root }}/nomad/jobs/traefik.nomad"
+  register: traefik_submit
+  changed_when: traefik_plan.rc == 1  # Plan shows changes needed
+  failed_when: traefik_submit.rc != 0 and traefik_plan.rc != 0  # Only fail if plan also failed
+  when: traefik_plan.rc != 0  # Only run if changes are needed or job doesn't exist
+
+- name: Render Hello job file (testing only)
   ansible.builtin.template:
     src: hello.nomad.j2
     dest: "{{ zfs_pool_root }}/nomad/jobs/hello.nomad"
     mode: '0644'
     owner: nomad
     group: nomad
+  when: deploy_test_services | default(false)
 
-- name: Check if Traefik job is running
-  ansible.builtin.command: nomad job status traefik
-  register: traefik_status
+- name: Check if Hello job needs updates (testing only)
+  ansible.builtin.command: nomad job plan "{{ zfs_pool_root }}/nomad/jobs/hello.nomad"
+  register: hello_plan
   failed_when: false
   changed_when: false
+  when: deploy_test_services | default(false)
 
-- name: Run Traefik job
-  ansible.builtin.command: nomad job run "{{ zfs_pool_root }}/nomad/jobs/traefik.nomad"
-  register: traefik_submit
-  changed_when: "traefik_submit.rc == 0"
-  when: traefik_status.rc != 0 or "Status = running" not in traefik_status.stdout
-
-- name: Check if Hello job is running
-  ansible.builtin.command: nomad job status hello
-  register: hello_status
-  failed_when: false
-  changed_when: false
-
-- name: Run Hello job
+- name: Deploy Hello job (testing only)
   ansible.builtin.command: nomad job run "{{ zfs_pool_root }}/nomad/jobs/hello.nomad"
   register: hello_submit
-  changed_when: "hello_submit.rc == 0"
-  when: hello_status.rc != 0 or "Status = running" not in hello_status.stdout
+  changed_when: hello_plan.rc == 1
+  failed_when: hello_submit.rc != 0 and hello_plan.rc != 0
+  when: deploy_test_services | default(false) and hello_plan.rc != 0
+
+- name: Render code-server job file
+  ansible.builtin.template:
+    src: code-server.nomad.j2
+    dest: "{{ zfs_pool_root }}/nomad/jobs/code-server.nomad"
+    mode: '0644'
+    owner: nomad
+    group: nomad
+  when: code_server_password is defined
+
+- name: Check if code-server job needs updates
+  ansible.builtin.command: nomad job plan "{{ zfs_pool_root }}/nomad/jobs/code-server.nomad"
+  register: code_server_plan
+  failed_when: false
+  changed_when: false
+  when: code_server_password is defined
+
+- name: Deploy code-server job
+  ansible.builtin.command: nomad job run "{{ zfs_pool_root }}/nomad/jobs/code-server.nomad"
+  register: code_server_submit
+  changed_when: code_server_plan.rc == 1
+  failed_when: code_server_submit.rc != 0 and code_server_plan.rc != 0
+  when: code_server_password is defined and code_server_plan.rc != 0

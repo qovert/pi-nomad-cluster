@@ -1,0 +1,93 @@
+job "code-server" {
+  datacenters = ["{{ consul_datacenter }}"]
+  type = "service"
+
+  # Pin to a specific node if desired, or let it run anywhere
+  constraint {
+    attribute = "${node.unique.name}"
+    operator  = "="
+    value     = "pistor0"  # Change this to your preferred node
+  }
+
+  group "code-server" {
+    count = 1
+
+    network {
+      mode = "bridge"
+      port "http" {
+        to = 8080
+      }
+    }
+
+    volume "workspace" {
+      type      = "host"
+      read_only = false
+      source    = "code_workspace"
+    }
+
+    task "code-server" {
+      driver = "docker"
+      
+      config {
+        image = "codercom/code-server:latest"
+        ports = ["http"]
+        
+        # Mount workspace directory
+        volumes = [
+          "local/config:/home/coder/.config",
+        ]
+        
+        args = [
+          "--bind-addr", "0.0.0.0:8080",
+          "--auth", "password",
+          "/workspace"
+        ]
+      }
+
+      env {
+        PASSWORD = "{{ code_server_password }}"
+      }
+
+      volume_mount {
+        volume      = "workspace" 
+        destination = "/workspace"
+        read_only   = false
+      }
+
+      # Create config directory
+      template {
+        data = <<EOH
+# Code-server configuration
+bind-addr: 0.0.0.0:8080
+auth: password
+password: {{ code_server_password }}
+cert: false
+EOH
+        destination = "local/config/code-server/config.yaml"
+      }
+
+      service {
+        name = "code-server"
+        port = "http"
+        
+        tags = [
+          "traefik.enable=true",
+          "traefik.http.routers.code-server.rule=Host(`code.{{ cluster_domain }}`)",
+          "traefik.http.routers.code-server.tls=true"
+        ]
+
+        check {
+          type     = "http"
+          path     = "/"
+          interval = "30s"
+          timeout  = "5s"
+        }
+      }
+
+      resources {
+        cpu    = 500
+        memory = 1024
+      }
+    }
+  }
+}

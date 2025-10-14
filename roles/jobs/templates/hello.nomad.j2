@@ -21,7 +21,8 @@ job "hello" {
         port = "http"
         tags = [
           "traefik.enable=true",
-          "traefik.http.routers.hello.rule=Host(`hello.local`)"
+          "traefik.http.routers.hello.rule=Host(`hello.{{ cluster_domain }}`)",
+          "traefik.http.routers.hello.tls=true"
         ]
         
         check {
