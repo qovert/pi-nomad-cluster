@@ -76,9 +76,14 @@ Set in `group_vars/all.yml` (use `ansible-vault edit` for secrets):
 
 ```yaml
 # Environment controls
-deploy_test_services: false  # Enable debug/test services
-deploy_code_server: true     # Deploy VS Code server
-clus_env: production         # Environment type
+deploy_test_services: false     # Enable debug/test services
+deploy_code_server: true        # Deploy VS Code server
+deploy_rocketchat: false        # Deploy RocketChat team collaboration
+clus_env: production            # Environment type
+
+# Deployment behavior
+verify_deployments: false       # Wait and verify health after deployment
+traefik_run_on_all_nodes: true  # Run Traefik on all nodes vs pistor0 only
 
 # Encrypted secrets (use ansible-vault)
 code_server_password: !vault |
@@ -117,7 +122,40 @@ The playbook will:
 
 - **Consul UI**: `http://[node-ip]:8500` - Service discovery and health checks
 - **Nomad UI**: `http://[node-ip]:4646` - Job management and monitoring  
-- **Traefik Dashboard**: `http://[node-ip]:[dynamic-port]/dashboard/` - Load balancer status
+- **Traefik Dashboard**: `http://[node-ip]:8080` - Load balancer status
+
+### Deployment Resilience
+
+The playbook includes several improvements to prevent deployment hangs and increase reliability:
+
+- **Detached deployments**: Jobs deploy with `--detach` to prevent hanging on health checks
+- **Timeout controls**: 30-second limits on deployment commands
+- **Conflict handling**: Graceful handling of "Cancelled due to newer version" errors
+- **Job type migration**: Automatically handles service↔system job type changes
+- **Health verification**: Optional post-deployment health checks (set `verify_deployments: true`)
+
+**Quick Status Check**:
+
+```bash
+# Run comprehensive deployment status check
+./scripts/check-deployments.sh
+
+# Manual checks
+nomad job status traefik
+nomad alloc logs $(nomad job allocs traefik | tail -1 | awk '{print $1}') traefik
+```
+
+**Troubleshooting Job Type Conflicts**:
+If you get "cannot update job from type X to Y" errors, the playbook automatically handles this by stopping and purging the existing job. For manual intervention:
+
+```bash
+# Force stop and restart Traefik
+ansible-playbook -i inventory/hosts.yml site.yml --ask-vault-pass -e force_stop_traefik=true
+
+# Or manually stop the job
+nomad job stop -purge traefik
+# Then run the playbook normally
+```
 
 ### Services (with TLS)
 

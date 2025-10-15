@@ -1,0 +1,101 @@
+job "rocketchat" {
+  datacenters = ["{{ consul_datacenter }}"]
+  type = "service"
+
+  group "database" {
+    network {
+      mode = "bridge"
+      port "mongo" { to = 27017 }
+    }
+
+    volume "mongo_data" {
+      type      = "host"
+      read_only = false
+      source    = "mongo_data"
+    }
+
+    task "mongo" {
+      driver = "docker"
+      
+      config {
+        image = "mongo:4.4"
+        ports = ["mongo"]
+        args = ["--replSet", "rs0", "--oplogSize", "128"]
+      }
+
+      volume_mount {
+        volume      = "mongo_data"
+        destination = "/data/db"
+        read_only   = false
+      }
+
+      env {
+        MONGO_INITDB_ROOT_USERNAME = "rocketchat"
+        MONGO_INITDB_ROOT_PASSWORD = "{{ rocketchat_mongo_password | default('changeme123') }}"
+      }
+
+      service {
+        name = "rocketchat-mongo"
+        port = "mongo"
+        
+        check {
+          type     = "tcp"
+          interval = "30s"
+          timeout  = "5s"
+        }
+      }
+
+      resources {
+        cpu    = 500
+        memory = 512
+      }
+    }
+  }
+
+  group "app" {
+    count = 1
+    
+    network {
+      mode = "bridge"
+      port "http" { to = 3000 }
+    }
+
+    task "rocketchat" {
+      driver = "docker"
+      
+      config {
+        image = "rocketchat/rocket.chat:latest"
+        ports = ["http"]
+      }
+
+      env {
+        MONGO_URL = "mongodb://rocketchat:{{ rocketchat_mongo_password | default('changeme123') }}@rocketchat-mongo.service.consul:27017/rocketchat?replicaSet=rs0&authSource=admin"
+        MONGO_OPLOG_URL = "mongodb://rocketchat:{{ rocketchat_mongo_password | default('changeme123') }}@rocketchat-mongo.service.consul:27017/local?replicaSet=rs0&authSource=admin"
+        ROOT_URL = "https://chat.{{ cluster_domain }}"
+        PORT = "3000"
+      }
+
+      service {
+        name = "rocketchat"
+        port = "http"
+        tags = [
+          "traefik.enable=true",
+          "traefik.http.routers.rocketchat.rule=Host(`chat.{{ cluster_domain }}`)",
+          "traefik.http.routers.rocketchat.tls=true"
+        ]
+        
+        check {
+          type     = "http"
+          path     = "/api/info"
+          interval = "30s"
+          timeout  = "10s"
+        }
+      }
+
+      resources {
+        cpu    = 1000
+        memory = 1024
+      }
+    }
+  }
+}

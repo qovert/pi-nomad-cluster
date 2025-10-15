@@ -37,16 +37,20 @@ nomad_host_volumes:
     path: "{{ zfs_pool_root }}/nomad/traefik-acme"
   code_workspace:
     path: "{{ zfs_pool_root }}/code-server/workspace"
+  mongo_data:
+    path: "{{ zfs_pool_root }}/mongodb"
 
 # Deployment control
-deploy_test_services: false  # Set to true for development/testing environments
-deploy_code_server: true    # Set to false if you don't want code-server in production
+deploy_test_services: false   # Set to true for development/testing environments
+deploy_code_server: true     # Set to false if you don't want code-server in production
+deploy_rocketchat: false     # Set to true to deploy RocketChat team collaboration platform
 
 # Environment type
 clus_env: production     # Options: development, staging, production
 
+# Deployment behavior control
+verify_deployments: false        # Set to true to wait and verify service health after deployment
+traefik_run_on_all_nodes: true   # Set to false to pin Traefik to pistor0 only
+
 # Code-server configuration (optional - define password to enable)
 # code_server_password: "your-secure-password-here"
-
-# Traefik deployment options
-traefik_run_on_all_nodes: false   # pin to pistor0

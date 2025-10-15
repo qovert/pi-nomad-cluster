@@ -72,8 +72,11 @@ EOH
         
         tags = [
           "traefik.enable=true",
-          "traefik.http.routers.code-server.rule=Host(`code.{{ cluster_domain }}`)",
-          "traefik.http.routers.code-server.tls=true"
+          "traefik.http.routers.code-server-https.rule=Host(`code.{{ cluster_domain }}`)",
+          "traefik.http.routers.code-server-https.tls=true",
+          "traefik.http.routers.code-server-https.entrypoints=websecure",
+          "traefik.http.routers.code-server-http.rule=Host(`code.{{ cluster_domain }}`)",
+          "traefik.http.routers.code-server-http.entrypoints=web"
         ]
 
         check {

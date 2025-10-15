@@ -38,6 +38,7 @@
     - "{{ zfs_pool_root }}/nomad/jobs"
     - "{{ zfs_pool_root }}/code-server"
     - "{{ zfs_pool_root }}/code-server/workspace"
+    - "{{ zfs_pool_root }}/mongodb"
 
 - name: Write nomad.hcl
   ansible.builtin.template:

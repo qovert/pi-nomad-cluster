@@ -1,4 +1,25 @@
 ---
+# Nomad Job Deployment Tasks
+#
+# RESILIENCE IMPROVEMENTS:
+# - All deployments use --detach flag to prevent hanging on health checks
+# - 30-second timeout on deployment commands to prevent indefinite waits
+# - Improved error handling for "Cancelled due to newer version" conflicts
+# - Optional verification with verify_deployments variable
+# - Traefik includes restart policies and check_restart configurations
+#
+# USAGE:
+# - Use verify_deployments=true to wait for services to become healthy
+# - Monitor deployments with: nomad job status <job-name>
+# - Check logs with: nomad alloc logs <alloc-id> <task-name>
+
+- name: Force stop Traefik job (if requested)
+  ansible.builtin.command: nomad job stop -purge traefik
+  register: force_stop_result
+  failed_when: false
+  changed_when: force_stop_result.rc == 0
+  when: force_stop_traefik | default(false)
+
 - name: Render Traefik job file
   ansible.builtin.template:
     src: traefik.nomad.j2
@@ -7,18 +28,110 @@
     owner: nomad
     group: nomad
 
+- name: Check existing Traefik job type
+  ansible.builtin.command: nomad job inspect traefik
+  register: traefik_inspect
+  failed_when: false
+  changed_when: false
+
+- name: Determine if job type needs to change
+  ansible.builtin.set_fact:
+    traefik_needs_type_change: >-
+      {{
+        traefik_inspect.rc == 0 and
+        (
+          (traefik_inspect.stdout is search('"Type":\s*"service"') and traefik_run_on_all_nodes | default(true)) or
+          (traefik_inspect.stdout is search('"Type":\s*"system"') and not (traefik_run_on_all_nodes | default(true)))
+        )
+      }}
+
+- name: Notify about job type change
+  ansible.builtin.debug:
+    msg: "Traefik job type is changing. Stopping existing job to allow redeployment with new type."
+  when: traefik_needs_type_change | default(false)
+
+- name: Stop existing Traefik job for type change
+  ansible.builtin.command: nomad job stop -purge traefik
+  register: traefik_stop
+  failed_when: false
+  changed_when: traefik_stop.rc == 0
+  when: traefik_needs_type_change | default(false)
+
+- name: Wait for Traefik job to be purged
+  ansible.builtin.pause:
+    seconds: 10
+  when: traefik_stop is defined and traefik_stop.changed
+
+- name: Verify job is purged before redeployment
+  ansible.builtin.command: nomad job status traefik
+  register: traefik_purge_check
+  failed_when: false
+  changed_when: false
+  retries: 5
+  delay: 2
+  until: traefik_purge_check.rc != 0
+  when: traefik_stop is defined and traefik_stop.changed
+
 - name: Check if Traefik job needs updates
   ansible.builtin.command: nomad job plan "{{ zfs_pool_root }}/nomad/jobs/traefik.nomad"
   register: traefik_plan
   failed_when: false
   changed_when: false
 
-- name: Deploy Traefik job
-  ansible.builtin.command: nomad job run "{{ zfs_pool_root }}/nomad/jobs/traefik.nomad"
+- name: Deploy Traefik job (non-blocking)
+  ansible.builtin.command: nomad job run -detach "{{ zfs_pool_root }}/nomad/jobs/traefik.nomad"
   register: traefik_submit
   changed_when: traefik_plan.rc == 1  # Plan shows changes needed
-  failed_when: traefik_submit.rc != 0 and traefik_plan.rc != 0  # Only fail if plan also failed
-  when: traefik_plan.rc != 0  # Only run if changes are needed or job doesn't exist
+  failed_when:
+    - traefik_submit.rc != 0
+    - not (traefik_submit.stderr is search("Cancelled due to newer version"))
+    - not (traefik_submit.stderr is search("cannot update job from type"))
+    - traefik_plan.rc != 0  # Only fail if plan also failed and it's not a version conflict
+  when: traefik_plan.rc != 0 or (traefik_stop is defined and traefik_stop.changed)  # Run if changes needed or job was stopped
+  timeout: 30  # Don't wait more than 30 seconds
+
+- name: Set Traefik deployment success fact
+  ansible.builtin.set_fact:
+    traefik_deployed_successfully: "{{ traefik_submit is not skipped and traefik_submit.rc == 0 }}"
+  when: traefik_submit is defined
+
+- name: Check Traefik deployment status
+  ansible.builtin.command: nomad job status traefik
+  register: traefik_status
+  changed_when: false
+  failed_when: false  # Don't fail on status check
+  when: traefik_deployed_successfully | default(false)
+
+- name: Report Traefik deployment result
+  ansible.builtin.debug:
+    msg: |
+      Traefik deployment initiated with detached mode for faster execution.
+      {% if traefik_status.rc == 0 %}
+      Status: {{ traefik_status.stdout_lines[1] if traefik_status.stdout_lines | length > 1 else 'Unknown' }}
+      {% endif %}
+
+      Monitor progress with:
+      - nomad job status traefik
+      - nomad alloc logs <alloc-id> traefik
+
+      Traefik should be available at:
+      - Dashboard: http://{{ ansible_default_ipv4.address }}:8080
+      - Web: http://{{ ansible_default_ipv4.address }}:80
+  when: traefik_deployed_successfully | default(false)
+
+- name: Wait for Traefik to become healthy (optional verification)
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:8080/ping"
+    method: GET
+    timeout: 5
+  register: traefik_health
+  retries: 6
+  delay: 10
+  failed_when: false  # Don't fail the playbook if this doesn't work
+  changed_when: false
+  when:
+    - traefik_deployed_successfully | default(false)
+    - verify_deployments | default(false)
 
 - name: Render Hello job file (testing only)
   ansible.builtin.template:
@@ -37,10 +150,11 @@
   when: deploy_test_services | default(false)
 
 - name: Deploy Hello job (testing only)
-  ansible.builtin.command: nomad job run "{{ zfs_pool_root }}/nomad/jobs/hello.nomad"
+  ansible.builtin.command: nomad job run -detach "{{ zfs_pool_root }}/nomad/jobs/hello.nomad"
   register: hello_submit
   changed_when: hello_plan.rc == 1
   failed_when: hello_submit.rc != 0 and hello_plan.rc != 0
+  timeout: 30
   when: deploy_test_services | default(false) and hello_plan.rc != 0
 
 - name: Render code-server job file
@@ -60,8 +174,36 @@
   when: code_server_password is defined
 
 - name: Deploy code-server job
-  ansible.builtin.command: nomad job run "{{ zfs_pool_root }}/nomad/jobs/code-server.nomad"
+  ansible.builtin.command: nomad job run -detach "{{ zfs_pool_root }}/nomad/jobs/code-server.nomad"
   register: code_server_submit
   changed_when: code_server_plan.rc == 1
   failed_when: code_server_submit.rc != 0 and code_server_plan.rc != 0
+  timeout: 30
   when: code_server_password is defined and code_server_plan.rc != 0
+
+- name: Render RocketChat job file
+  ansible.builtin.template:
+    src: rocketchat.nomad.j2
+    dest: "{{ zfs_pool_root }}/nomad/jobs/rocketchat.nomad"
+    mode: '0644'
+    owner: nomad
+    group: nomad
+  when: deploy_rocketchat | default(false)
+
+- name: Check if RocketChat job needs updates
+  ansible.builtin.command: nomad job plan "{{ zfs_pool_root }}/nomad/jobs/rocketchat.nomad"
+  register: rocketchat_plan
+  failed_when: false
+  changed_when: false
+  when: deploy_rocketchat | default(false)
+
+- name: Deploy RocketChat job
+  ansible.builtin.command: nomad job run -detach "{{ zfs_pool_root }}/nomad/jobs/rocketchat.nomad"
+  register: rocketchat_submit
+  changed_when: rocketchat_plan.rc == 1
+  failed_when:
+    - rocketchat_submit.rc != 0
+    - not (rocketchat_submit.stderr is search("Cancelled due to newer version"))
+    - rocketchat_plan.rc != 0
+  timeout: 30
+  when: deploy_rocketchat | default(false) and rocketchat_plan.rc != 0

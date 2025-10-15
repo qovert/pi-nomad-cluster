@@ -13,17 +13,15 @@ job "traefik" {
 
   group "gw" {
     network {
-      mode = "bridge"
+      mode = "host"
       port "web" {
         static = 80
-        to = 80
       }
       port "websecure" {
         static = 443
-        to = 443
       }
       port "dashboard" {
-        to = 8080
+        static = 8080
       }
     }
 
@@ -45,7 +43,9 @@ job "traefik" {
           "--entrypoints.web.address=:80",
           "--entrypoints.websecure.address=:443",
           "--providers.consulcatalog=true",
-          "--providers.consulcatalog.endpoint.address={{ ansible_default_ipv4.address }}:8500"
+          "--providers.consulcatalog.endpoint.address=127.0.0.1:8500",
+          "--providers.consulcatalog.exposedbydefault=false",
+          "--providers.consulcatalog.prefix=traefik"
         ]
       }
       
@@ -61,20 +61,61 @@ job "traefik" {
         cpu    = 200
         memory = 256
       }
+
+      restart {
+        attempts = 5
+        interval = "10m"
+        delay    = "15s"
+        mode     = "delay"
+      }
       
       service {
         name = "traefik"
-        address_mode = "driver"
-        port = 80
-        tags = ["traefik.enable=true"]
+        address_mode = "host"
+        port = "web"
+        tags = [
+          "traefik.enable=true",
+          "traefik.http.routers.dashboard.rule=PathPrefix(`/dashboard`) || PathPrefix(`/api`)",
+          "traefik.http.routers.dashboard.service=api@internal"
+        ]
         
         check {
-          name     = "traefik-web"
-          type     = "tcp"
-          address_mode = "driver"
-          port     = 80
-          interval = "10s"
-          timeout  = "3s"
+          name           = "traefik-web"
+          type           = "http"
+          address_mode   = "host"
+          port           = "web"
+          path           = "/ping"
+          interval       = "15s"
+          timeout        = "5s"
+          initial_status = "passing"
+          check_restart {
+            limit = 3
+            grace = "15s"
+          }
+        }
+      }
+
+      service {
+        name = "traefik-dashboard"
+        address_mode = "host"
+        port = "dashboard"
+        tags = [
+          "traefik.enable=false"
+        ]
+        
+        check {
+          name           = "traefik-dashboard"
+          type           = "http"
+          address_mode   = "host"  
+          port           = "dashboard"
+          path           = "/ping"
+          interval       = "15s"
+          timeout        = "5s"
+          initial_status = "passing"
+          check_restart {
+            limit = 3
+            grace = "15s"
+          }
         }
       }
     }
