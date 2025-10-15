@@ -5,7 +5,12 @@
   gather_facts: true
   roles:
     - role: base
+      tags: ['base', 'setup', 'packages']
     - role: docker
+      tags: ['docker', 'runtime', 'containers']
     - role: consul
+      tags: ['consul', 'discovery', 'cluster']
     - role: nomad
+      tags: ['nomad', 'orchestration', 'cluster']
     - role: jobs
+      tags: ['jobs', 'services', 'apps']

@@ -19,6 +19,7 @@
   failed_when: false
   changed_when: force_stop_result.rc == 0
   when: force_stop_traefik | default(false)
+  tags: ['traefik', 'loadbalancer', 'stop', 'force']
 
 - name: Render Traefik job file
   ansible.builtin.template:
@@ -27,12 +28,14 @@
     mode: '0644'
     owner: nomad
     group: nomad
+  tags: ['traefik', 'loadbalancer', 'template', 'jobs']
 
 - name: Check existing Traefik job type
   ansible.builtin.command: nomad job inspect traefik
   register: traefik_inspect
   failed_when: false
   changed_when: false
+  tags: ['traefik', 'loadbalancer', 'inspect', 'jobs']
 
 - name: Determine if job type needs to change
   ansible.builtin.set_fact:
@@ -44,11 +47,13 @@
           (traefik_inspect.stdout is search('"Type":\s*"system"') and not (traefik_run_on_all_nodes | default(true)))
         )
       }}
+  tags: ['traefik', 'loadbalancer', 'migration', 'jobs']
 
 - name: Notify about job type change
   ansible.builtin.debug:
     msg: "Traefik job type is changing. Stopping existing job to allow redeployment with new type."
   when: traefik_needs_type_change | default(false)
+  tags: ['traefik', 'loadbalancer', 'migration', 'jobs']
 
 - name: Stop existing Traefik job for type change
   ansible.builtin.command: nomad job stop -purge traefik
@@ -56,6 +61,7 @@
   failed_when: false
   changed_when: traefik_stop.rc == 0
   when: traefik_needs_type_change | default(false)
+  tags: ['traefik', 'loadbalancer', 'migration', 'stop', 'jobs']
 
 - name: Wait for Traefik job to be purged
   ansible.builtin.pause:
@@ -77,6 +83,7 @@
   register: traefik_plan
   failed_when: false
   changed_when: false
+  tags: ['traefik', 'loadbalancer', 'plan', 'jobs']
 
 - name: Deploy Traefik job (non-blocking)
   ansible.builtin.command: nomad job run -detach "{{ zfs_pool_root }}/nomad/jobs/traefik.nomad"
@@ -89,11 +96,13 @@
     - traefik_plan.rc != 0  # Only fail if plan also failed and it's not a version conflict
   when: traefik_plan.rc != 0 or (traefik_stop is defined and traefik_stop.changed)  # Run if changes needed or job was stopped
   timeout: 30  # Don't wait more than 30 seconds
+  tags: ['traefik', 'loadbalancer', 'deploy', 'jobs']
 
 - name: Set Traefik deployment success fact
   ansible.builtin.set_fact:
     traefik_deployed_successfully: "{{ traefik_submit is not skipped and traefik_submit.rc == 0 }}"
   when: traefik_submit is defined
+  tags: ['traefik', 'loadbalancer', 'deploy', 'jobs']
 
 - name: Check Traefik deployment status
   ansible.builtin.command: nomad job status traefik
@@ -101,6 +110,7 @@
   changed_when: false
   failed_when: false  # Don't fail on status check
   when: traefik_deployed_successfully | default(false)
+  tags: ['traefik', 'loadbalancer', 'status', 'jobs']
 
 - name: Report Traefik deployment result
   ansible.builtin.debug:
@@ -118,6 +128,7 @@
       - Dashboard: http://{{ ansible_default_ipv4.address }}:8080
       - Web: http://{{ ansible_default_ipv4.address }}:80
   when: traefik_deployed_successfully | default(false)
+  tags: ['traefik', 'loadbalancer', 'status', 'jobs']
 
 - name: Wait for Traefik to become healthy (optional verification)
   ansible.builtin.uri:
@@ -132,6 +143,7 @@
   when:
     - traefik_deployed_successfully | default(false)
     - verify_deployments | default(false)
+  tags: ['traefik', 'loadbalancer', 'verify', 'health', 'jobs']
 
 - name: Render Hello job file (testing only)
   ansible.builtin.template:
@@ -141,6 +153,7 @@
     owner: nomad
     group: nomad
   when: deploy_test_services | default(false)
+  tags: ['hello', 'test', 'debug', 'template', 'jobs']
 
 - name: Check if Hello job needs updates (testing only)
   ansible.builtin.command: nomad job plan "{{ zfs_pool_root }}/nomad/jobs/hello.nomad"
@@ -148,6 +161,7 @@
   failed_when: false
   changed_when: false
   when: deploy_test_services | default(false)
+  tags: ['hello', 'test', 'debug', 'plan', 'jobs']
 
 - name: Deploy Hello job (testing only)
   ansible.builtin.command: nomad job run -detach "{{ zfs_pool_root }}/nomad/jobs/hello.nomad"
@@ -156,6 +170,7 @@
   failed_when: hello_submit.rc != 0 and hello_plan.rc != 0
   timeout: 30
   when: deploy_test_services | default(false) and hello_plan.rc != 0
+  tags: ['hello', 'test', 'debug', 'deploy', 'jobs']
 
 - name: Render code-server job file
   ansible.builtin.template:
@@ -165,6 +180,7 @@
     owner: nomad
     group: nomad
   when: code_server_password is defined
+  tags: ['code-server', 'ide', 'template', 'jobs']
 
 - name: Check if code-server job needs updates
   ansible.builtin.command: nomad job plan "{{ zfs_pool_root }}/nomad/jobs/code-server.nomad"
@@ -172,6 +188,7 @@
   failed_when: false
   changed_when: false
   when: code_server_password is defined
+  tags: ['code-server', 'ide', 'plan', 'jobs']
 
 - name: Deploy code-server job
   ansible.builtin.command: nomad job run -detach "{{ zfs_pool_root }}/nomad/jobs/code-server.nomad"
@@ -180,6 +197,7 @@
   failed_when: code_server_submit.rc != 0 and code_server_plan.rc != 0
   timeout: 30
   when: code_server_password is defined and code_server_plan.rc != 0
+  tags: ['code-server', 'ide', 'deploy', 'jobs']
 
 - name: Render RocketChat job file
   ansible.builtin.template:
@@ -189,6 +207,7 @@
     owner: nomad
     group: nomad
   when: deploy_rocketchat | default(false)
+  tags: ['rocketchat', 'chat', 'collaboration', 'template', 'jobs']
 
 - name: Check if RocketChat job needs updates
   ansible.builtin.command: nomad job plan "{{ zfs_pool_root }}/nomad/jobs/rocketchat.nomad"
@@ -196,6 +215,7 @@
   failed_when: false
   changed_when: false
   when: deploy_rocketchat | default(false)
+  tags: ['rocketchat', 'chat', 'collaboration', 'plan', 'jobs']
 
 - name: Deploy RocketChat job
   ansible.builtin.command: nomad job run -detach "{{ zfs_pool_root }}/nomad/jobs/rocketchat.nomad"
@@ -207,3 +227,4 @@
     - rocketchat_plan.rc != 0
   timeout: 30
   when: deploy_rocketchat | default(false) and rocketchat_plan.rc != 0
+  tags: ['rocketchat', 'chat', 'collaboration', 'deploy', 'jobs']

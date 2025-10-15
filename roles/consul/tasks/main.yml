@@ -3,17 +3,20 @@
   ansible.builtin.apt_key:
     url: https://apt.releases.hashicorp.com/gpg
     state: present
+  tags: ['hashicorp', 'packages', 'consul', 'setup']
 
 - name: Add HashiCorp apt repo
   ansible.builtin.apt_repository:
     repo: "deb [arch=arm64] https://apt.releases.hashicorp.com bookworm main"
     state: present
+  tags: ['hashicorp', 'packages', 'consul', 'setup']
 
 - name: Install Consul
   ansible.builtin.apt:
     name: consul
     state: present
     update_cache: true
+  tags: ['install', 'consul', 'packages']
 
 - name: Create Consul data directory with proper ownership
   ansible.builtin.file:
@@ -22,6 +25,7 @@
     mode: '0755'
     owner: consul
     group: consul
+  tags: ['directories', 'consul', 'storage', 'setup']
 
 - name: Generate gossip key (run once on first host)
   ansible.builtin.command: consul keygen
@@ -29,15 +33,18 @@
   run_once: true
   changed_when: true
   delegate_to: "{{ groups['all'][0] }}"
+  tags: ['security', 'consul', 'cluster', 'encryption']
 
 - name: Set cluster gossip key fact
   ansible.builtin.set_fact:
     consul_gossip_key: "{{ cgk.stdout }}"
   run_once: true
+  tags: ['security', 'consul', 'cluster', 'encryption']
 
 - name: Distribute gossip key to all hosts
   ansible.builtin.set_fact:
     consul_gossip_key: "{{ hostvars[groups['all'][0]].consul_gossip_key }}"
+  tags: ['security', 'consul', 'cluster', 'encryption']
 
 - name: Write consul.hcl
   ansible.builtin.template:
@@ -47,9 +54,11 @@
     group: root
     mode: '0644'
   notify: Restart consul
+  tags: ['config', 'consul', 'cluster']
 
 - name: Enable & start consul
   ansible.builtin.systemd:
     name: consul
     state: started
     enabled: true
+  tags: ['service', 'consul', 'start']

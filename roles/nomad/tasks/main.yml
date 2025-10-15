@@ -4,6 +4,7 @@
     name: nomad
     state: present
     update_cache: true
+  tags: ['install', 'nomad', 'packages']
 
 - name: Create CNI plugins directory
   ansible.builtin.file:
@@ -12,6 +13,7 @@
     mode: '0755'
     owner: root
     group: root
+  tags: ['directories', 'networking', 'cni', 'setup']
 
 - name: Download and install CNI plugins
   ansible.builtin.unarchive:
@@ -23,6 +25,7 @@
     mode: '0755'
     creates: /opt/cni/bin/bridge
   notify: Restart nomad
+  tags: ['networking', 'cni', 'plugins', 'download']
 
 - name: Create Nomad directories with proper ownership
   ansible.builtin.file:
@@ -39,6 +42,7 @@
     - "{{ zfs_pool_root }}/code-server"
     - "{{ zfs_pool_root }}/code-server/workspace"
     - "{{ zfs_pool_root }}/mongodb"
+  tags: ['directories', 'nomad', 'storage', 'setup']
 
 - name: Write nomad.hcl
   ansible.builtin.template:
@@ -48,6 +52,7 @@
     group: root
     mode: '0644'
   notify: Restart nomad
+  tags: ['config', 'nomad', 'cluster']
 
 - name: Ensure host volume directories exist
   ansible.builtin.file:
@@ -55,9 +60,11 @@
     state: directory
     mode: '0755'
   loop: "{{ nomad_host_volumes | dict2items }}"
+  tags: ['directories', 'volumes', 'nomad', 'storage']
 
 - name: Enable & start nomad
   ansible.builtin.systemd:
     name: nomad
     state: started
     enabled: true
+  tags: ['service', 'nomad', 'start']
