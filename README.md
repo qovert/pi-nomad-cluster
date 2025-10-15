@@ -110,6 +110,32 @@ ansible-playbook -i inventory/hosts.yml site.yml --vault-password-file ~/.vault_
 ansible-vault edit group_vars/all.yml --vault-password-file ~/.vault_pass
 ```
 
+### Selective Deployment with Tags
+
+The playbook includes comprehensive tagging for selective deployment:
+
+```bash
+# Deploy only infrastructure (skip applications)
+ansible-playbook site.yml --tags "base,docker,consul,nomad"
+
+# Deploy only Traefik load balancer
+ansible-playbook site.yml --tags "traefik"
+
+# Deploy only code-server IDE
+ansible-playbook site.yml --tags "code-server"
+
+# Deploy only RocketChat
+ansible-playbook site.yml --tags "rocketchat"
+
+# Run verification/health checks only
+ansible-playbook site.yml --tags "verify,health"
+
+# See all available tags
+ansible-playbook site.yml --list-tags
+```
+
+See [TAGS.md](TAGS.md) for complete tag reference and advanced usage examples.
+
 ## What Gets Deployed
 
 The playbook will:
